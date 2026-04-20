@@ -1,0 +1,49 @@
+services:
+  asterisk-db:
+    image: postgres:15
+    container_name: asterisk-db
+    environment:
+      POSTGRES_USER: asterisk
+      POSTGRES_PASSWORD: asterisk_password
+      POSTGRES_DB: asterisk
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - asterisk-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asterisk -d asterisk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  asterisk:
+    build: ./asterisk
+    container_name: asterisk
+    restart: unless-stopped
+    networks:
+      - asterisk-net
+    ports:
+      - "5060:5060/udp"
+      - "10000-10050:10000-10050/udp"
+    volumes:
+      - ./asterisk/config/res_odbc.conf:/etc/asterisk/res_odbc.conf
+      - ./asterisk/config/extconfig.conf:/etc/asterisk/extconfig.conf
+      - ./asterisk/config/odbc.ini:/etc/odbc.ini
+      - ./asterisk/config/odbcinst.ini:/etc/odbcinst.ini
+      - ./asterisk/config/sorcery.conf:/etc/asterisk/sorcery.conf
+      - ./asterisk/config/pjsip.conf:/etc/asterisk/pjsip.conf
+      - ./asterisk/config/extensions.conf:/etc/asterisk/extensions.conf
+      - ./asterisk/config/modules.conf:/etc/asterisk/modules.conf
+      - ./asterisk/config/rtp.conf:/etc/asterisk/rtp.conf
+    depends_on:
+      asterisk-db:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+
+networks:
+  asterisk-net:
+    driver: bridge
