@@ -1,0 +1,34 @@
+---
+- name: Add New SIP User to Asterisk PBX
+  hosts: localhost
+  gather_facts: false
+  
+  # Default variables (can be overridden when running the command)
+  vars:
+    sip_user: "1003"
+    sip_pass: "supersecret123"
+
+  tasks:
+    - name: Inject user records into PostgreSQL via Docker
+      ansible.builtin.shell: |
+        docker exec -i asterisk-db psql -U asterisk -d asterisk <<EOF
+        -- Create the Endpoint (ignore if it already exists)
+        INSERT INTO psip_endpoints (id, aors, auth) 
+        VALUES ('{{ sip_user }}', '{{ sip_user }}', '{{ sip_user }}') 
+        ON CONFLICT (id) DO NOTHING;
+
+        -- Create or Update the Auth (updates password if user exists)
+        INSERT INTO psip_auths (id, username, password) 
+        VALUES ('{{ sip_user }}', '{{ sip_user }}', '{{ sip_pass }}') 
+        ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password;
+
+        -- Create the AOR (ignore if it already exists)
+        INSERT INTO psip_aors (id) 
+        VALUES ('{{ sip_user }}') 
+        ON CONFLICT (id) DO NOTHING;
+        EOF
+      register: db_output
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "Successfully provisioned User {{ sip_user }} in the Realtime database!"
